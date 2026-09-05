@@ -1,0 +1,34 @@
+# Чем меньше контекст сборки, тем быстрее docker build.
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.git/
+.gitignore
+
+# База остаётся на хосте и подключается томом.
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Секреты в образ не попадают: токен приходит через env_file.
+.env
+
+tests/
+pytest.ini
+.pytest_cache/
+.mypy_cache/
+
+README.md
+maluna_bot_system_prompt3.md
+MALUNA_rituals.xlsx
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+.DS_Store
+~$*.xlsx

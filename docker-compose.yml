@@ -1,0 +1,25 @@
+services:
+  bot:
+    build: .
+    container_name: maluna-bot
+    restart: unless-stopped
+
+    # Токен и остальные настройки берутся из .env рядом с этим файлом.
+    env_file: .env
+
+    # Порт health-check. Если поменяешь HEALTH_PORT в .env, менять тут ничего не нужно.
+    ports:
+      - "${HEALTH_PORT:-8080}:${HEALTH_PORT:-8080}"
+
+    volumes:
+      # База переживает пересборку контейнера.
+      - ./data:/app/data
+      # Контент можно править на хосте и применять командой /reload без пересборки.
+      - ./content:/app/content
+
+    # Логи не должны съесть диск за полгода работы.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

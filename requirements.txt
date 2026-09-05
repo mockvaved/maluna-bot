@@ -1,0 +1,14 @@
+aiogram==3.30.0
+aiosqlite==0.20.0
+pydantic==2.10.4
+PyYAML==6.0.2
+python-dotenv==1.0.1
+aiohttp==3.11.11
+openpyxl==3.1.5
+
+# Опционально: FSM в Redis вместо памяти (включается переменной REDIS_URL)
+redis==5.2.1
+
+# Только для разработки
+pytest==8.3.4
+pytest-asyncio==0.25.0
