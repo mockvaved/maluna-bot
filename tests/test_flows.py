@@ -168,7 +168,7 @@ async def test_ritual_flow_end_to_end(app: Harness) -> None:
     await app.press("15 минут")
 
     assert "Шаг 3 из 5" in app.text
-    await app.press("устала")
+    await app.press("нет сил")
 
     assert "Шаг 4 из 5" in app.text
     await app.press("отдохнуть")
@@ -195,7 +195,7 @@ async def test_ritual_back_button_returns_to_previous_step(app: Harness) -> None
 async def test_ritual_multi_select_requires_one_item(app: Harness) -> None:
     await app.send("/start")
     await app.press("✨ Собери свой ритуал")
-    for answer in ("вечер", "15 минут", "устала", "отдохнуть"):
+    for answer in ("вечер", "15 минут", "нет сил", "отдохнуть"):
         await app.press(answer)
 
     await app.press("Готово")
@@ -218,7 +218,7 @@ async def test_same_ritual_is_not_repeated_within_a_session(app: Harness) -> Non
 
     async def run_flow() -> str:
         await app.press("✨ Собери свой ритуал")
-        for answer in ("вечер", "30 минут", "устала", "создать уют"):
+        for answer in ("вечер", "30 минут", "нет сил", "создать уют"):
             await app.press(answer)
         await app.press("свечи MALUNA")
         await app.press("Готово")
@@ -234,7 +234,7 @@ async def test_same_ritual_is_not_repeated_within_a_session(app: Harness) -> Non
 async def test_another_option_gives_a_different_ritual(app: Harness) -> None:
     await app.send("/start")
     await app.press("✨ Собери свой ритуал")
-    for answer in ("вечер", "30 минут", "устала", "отдохнуть"):
+    for answer in ("вечер", "30 минут", "нет сил", "отдохнуть"):
         await app.press(answer)
     await app.press("свечи MALUNA")
     await app.press("Готово")
@@ -337,15 +337,48 @@ async def test_guide_disposal_cards(app: Harness) -> None:
     assert "воск" in app.text.lower()
 
 
-async def test_guide_product_card(app: Harness) -> None:
+async def test_guide_top_level_shows_groups_not_every_category(app: Harness) -> None:
+    """Пять видов свечей спрятаны за одной кнопкой, а не вывалены списком."""
     await app.send("/start")
     await app.press("📖 Справочник")
     await app.press("Как пользоваться")
-    await app.press("Свечи")
-    await app.press("Зелёная свеча с базиликом")
 
-    assert "Как пользоваться:" in app.text
-    assert "Хранение:" in app.text
+    assert "Свечи" in app.buttons
+    assert "Астросвечи" not in app.buttons  # второй уровень пока не раскрыт
+    assert "Косметика" in app.buttons
+
+
+async def test_guide_two_level_path_to_a_product(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("📖 Справочник")
+    await app.press("Как пользоваться")
+
+    await app.press("Свечи")
+    assert "Астросвечи" in app.buttons
+    assert "Моно наборы" in app.buttons
+
+    await app.press("Моно наборы")
+    assert "Зеленые свечи с базиликом" in app.buttons
+
+    await app.press("Зеленые свечи с базиликом")
+    assert "базилик" in app.text.lower()
+
+    # «Назад» из категории возвращает в группу, а не в самое начало.
+    await app.press("Назад")
+    assert "Зеленые свечи с базиликом" in app.buttons
+    await app.press("Назад")
+    assert "Астросвечи" in app.buttons
+
+
+async def test_product_card_is_sent_with_a_photo(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("📖 Справочник")
+    await app.press("Как пользоваться")
+    await app.press("Косметика")
+    await app.press("Увлажняющий крем")
+
+    assert "SendPhoto" in [type(call).__name__ for call in app.session.calls]
+    assert "масло ши" in app.session.captions_and_texts().lower()
 
 
 # ── Свободный текст ─────────────────────────────────────────────────

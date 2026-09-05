@@ -9,14 +9,16 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from bot.config import Config
 from bot.content.schemas import Product, Texts
 from bot.content.store import ContentSnapshot, ContentStore
 from bot.db.repo import Repository
-from bot.handlers.common import render, show_screen, user_id_of
+from bot.handlers.common import render, show_photo_screen, show_screen, user_id_of
 from bot.keyboards.builders import (
     guide_back,
     guide_category,
     guide_disposal,
+    guide_group,
     guide_how_to_use,
     guide_practices,
     guide_root,
@@ -48,6 +50,24 @@ async def show_how_to_use(callback: CallbackQuery, content_store: ContentStore) 
     await show_screen(callback, texts.guide.how_to_use_title, guide_how_to_use(texts, content))
 
 
+@router.callback_query(GuideCB.filter(F.action == "group"))
+async def show_group(
+    callback: CallbackQuery, callback_data: GuideCB, content_store: ContentStore
+) -> None:
+    """Второй уровень: подвиды внутри группы, например виды свечей."""
+    await callback.answer()
+    content = content_store.current
+    texts = content.texts
+    groups = content.groups()
+
+    if not 0 <= callback_data.value < len(groups):
+        await show_screen(callback, texts.guide.how_to_use_title, guide_how_to_use(texts, content))
+        return
+
+    label = groups[callback_data.value][1]
+    await show_screen(callback, label, guide_group(texts, content, callback_data.value))
+
+
 @router.callback_query(GuideCB.filter(F.action == "category"))
 async def show_category(
     callback: CallbackQuery, callback_data: GuideCB, content_store: ContentStore
@@ -71,6 +91,7 @@ async def show_product(
     callback_data: GuideCB,
     content_store: ContentStore,
     repo: Repository,
+    config: Config,
 ) -> None:
     await callback.answer()
     content = content_store.current
@@ -88,11 +109,14 @@ async def show_product(
 
     product = products[callback_data.value]
     await repo.log_event(user_id_of(callback), "product_opened", {"product_id": product.id})
-    await show_screen(
-        callback,
-        _render_product(texts, product),
-        guide_back(texts, GuideCB(action="category", value=callback_data.extra)),
-    )
+
+    body = _render_product(texts, product)
+    markup = guide_back(texts, GuideCB(action="category", value=callback_data.extra))
+
+    if product.photo:
+        await show_photo_screen(callback, config.content_dir / product.photo, body, markup)
+        return
+    await show_screen(callback, body, markup)
 
 
 @router.callback_query(GuideCB.filter(F.action == "practices"))
@@ -175,6 +199,8 @@ def _render_product(texts: Texts, product: Product) -> str:
         render(texts.guide.product_card, name=product.name, short_desc=product.short_desc).strip()
     ]
 
+    if product.description:
+        blocks.append(product.description.strip())
     if product.how_to_use:
         steps = "\n".join(f"{index}. {step}" for index, step in enumerate(product.how_to_use, 1))
         blocks.append(f"{texts.guide.product_how_to_use}\n{steps}")

@@ -285,17 +285,13 @@ async def _show_result(
     await state.update_data({KEY_SHOWN_RITUALS: shown})
     await repo.log_event(user_id_of(callback), "ritual_shown", {"ritual_id": ritual.id})
 
-    products = content.products_for_items(ritual.items)
+    links = content.ritual_links(ritual.items)
     body = render(texts.ritual.result, title=ritual.title, text=ritual.text.strip()).strip()
-    if products:
+    if links:
         body = f"{body}\n\n{texts.ritual.products_header}"
 
     has_alternative = pick_ritual(ranked, frozenset(shown)) is not None
-    await show_screen(
-        callback,
-        body,
-        ritual_result(texts, content, [product.id for product in products], has_alternative),
-    )
+    await show_screen(callback, body, ritual_result(texts, content, links, has_alternative))
 
 
 def _restore_ranking(content: ContentSnapshot, stored: list) -> list[ScoredRitual]:

@@ -31,21 +31,14 @@ ANY_VALUE = "любое"
 
 CANDLE_ITEM = "свечи MALUNA"
 
-# Какой категории продуктов соответствует предмет из пятого вопроса.
-# Нужно, чтобы под ритуалом показать кнопки на карточки продуктов MALUNA.
-# Предметы без пары (душ, ванна, кофе, чай) продуктами бренда не являются.
-ITEM_TO_CATEGORY = {
-    "свечи MALUNA": "candle",
-    "увлажняющий крем MALUNA": "cream",
-    "гидрофильное масло MALUNA": "hydrophilic_oil",
-    "очищающий гель MALUNA": "cleansing_gel",
-}
-
 # Разделы справочника, которые бот умеет показывать.
 SECTION_HOW_TO_USE = "Как пользоваться"
 SECTION_DISPOSAL = "Утилизация"
 
 _DDMM_RE = re.compile(r"^\d{2}\.\d{2}$")
+
+# Цены, скидки и промокоды в текстах запрещены (ТЗ, раздел 3).
+_PRICE_RE = re.compile(r"₽|\bруб\b|\bруб\.|\bскидк|\bпромокод|\bпо цене\b", re.IGNORECASE)
 
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 
@@ -122,14 +115,31 @@ def _check_vocabulary(
 class Product(ContentModel):
     id: NonEmptyStr
     name: NonEmptyStr
+    # Верхний уровень меню справочника. Пусто — товар лежит сразу в корне.
+    group: str = ""
     category: NonEmptyStr
     short_desc: NonEmptyStr
+    # Полное описание из каталога бренда.
+    description: str = ""
     how_to_use: list[str] = Field(default_factory=list)
     care: str = ""
     disposal: str = ""
     mood_tags: list[str] = Field(default_factory=list)
-    photo: str = ""
+    # Пути к картинкам относительно папки content. Показывается первая.
+    photos: list[str] = Field(default_factory=list)
     active: bool = True
+
+    @field_validator("description", "short_desc")
+    @classmethod
+    def _no_prices(cls, value: str) -> str:
+        # ТЗ, раздел 3: ни цен, ни скидок, ни промокодов.
+        if _PRICE_RE.search(value):
+            raise ValueError("prices and discounts are not allowed in product texts")
+        return value
+
+    @property
+    def photo(self) -> str:
+        return self.photos[0] if self.photos else ""
 
 
 # ── astro_2027 ──────────────────────────────────────────────────────
@@ -213,8 +223,22 @@ class PredictionTexts(ContentModel):
 class RitualQuestion(ContentModel):
     key: NonEmptyStr
     text: NonEmptyStr
+    # Значения из словаря ТЗ. Они же ключи подбора ритуала — менять нельзя.
     options: list[NonEmptyStr] = Field(min_length=2)
+    # Подписи кнопок, если показывать нужно не сам ключ: {ключ: подпись}.
+    # Так «устала» на экране становится нейтральным «нет сил».
+    option_labels: dict[str, NonEmptyStr] = Field(default_factory=dict)
     multi: bool = False
+
+    def label(self, option: str) -> str:
+        return self.option_labels.get(option, option)
+
+    @model_validator(mode="after")
+    def _labels_match_options(self) -> RitualQuestion:
+        unknown = sorted(set(self.option_labels) - set(self.options))
+        if unknown:
+            raise ValueError(f"option_labels refer to missing options: {', '.join(unknown)}")
+        return self
 
 
 class RitualTexts(ContentModel):
@@ -228,6 +252,9 @@ class RitualTexts(ContentModel):
     cancelled: NonEmptyStr
     result: NonEmptyStr
     products_header: NonEmptyStr
+    # Куда ведёт кнопка предмета под ритуалом: {предмет: id товара или код группы}.
+    # Предметов из пятого вопроса, которых тут нет, под ритуалом не будет.
+    item_links: dict[str, NonEmptyStr] = Field(default_factory=dict)
     questions: list[RitualQuestion] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -286,6 +313,9 @@ class GuideTexts(ContentModel):
     product_how_to_use: NonEmptyStr
     product_care: NonEmptyStr
     product_disposal: NonEmptyStr
+    # Подписи для меню. Слева код из products.yaml, справа то, что видит человек.
+    # Нет подписи — показывается сам код.
+    groups: dict[str, str] = Field(default_factory=dict)
     categories: dict[str, str] = Field(default_factory=dict)
 
 
@@ -339,7 +369,6 @@ __all__ = [
     "CANDLE_ITEM",
     "DESIRE_VALUES",
     "DURATION_VALUES",
-    "ITEM_TO_CATEGORY",
     "ITEM_VALUES",
     "MOOD_VALUES",
     "SECTION_DISPOSAL",

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardMarkup, Message
 
 from bot.content.schemas import Texts
 from bot.keyboards.builders import main_menu
@@ -16,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 MENU_SEPARATOR = "\n\n"
 
-# Ограничение Telegram на длину текстового сообщения.
+# Ограничения Telegram: длина текстового сообщения и подписи к фото.
 MESSAGE_LIMIT = 4096
+CAPTION_LIMIT = 1024
 
 
 def render(template: str, **values: object) -> str:
@@ -57,6 +59,56 @@ def split_text(text: str, limit: int = MESSAGE_LIMIT) -> list[str]:
     if current:
         chunks.append(current)
     return chunks
+
+
+async def show_photo_screen(
+    event: Message | CallbackQuery,
+    photo: Path,
+    text: str,
+    markup: InlineKeyboardMarkup | None = None,
+) -> None:
+    """Экран с картинкой: фото сверху, под ним текст и кнопки.
+
+    Если текст влезает в подпись — получается одно сообщение. Если нет,
+    подписью идёт первый абзац, остальное уходит следующим сообщением.
+
+    Картинка не должна ломать экран: не нашёлся файл или Telegram его не
+    принял — показываем ту же карточку текстом.
+    """
+    message = event.message if isinstance(event, CallbackQuery) else event
+    if message is None or not photo.is_file():
+        if message is None:
+            await show_screen(event, text, markup)
+            return
+        logger.info("product_photo_missing", extra={"photo": str(photo)})
+        await show_screen(event, text, markup)
+        return
+
+    # Новый экран приходит отдельными сообщениями, поэтому у старого
+    # убираем кнопки — иначе на экране будет две живые клавиатуры.
+    if isinstance(event, CallbackQuery):
+        await _drop_markup(message)
+
+    fits = len(text) <= CAPTION_LIMIT
+    caption = text if fits else text.split("\n\n", 1)[0][:CAPTION_LIMIT]
+
+    try:
+        await message.answer_photo(
+            FSInputFile(photo),
+            caption=caption,
+            reply_markup=markup if fits else None,
+        )
+    except TelegramAPIError as exc:
+        logger.warning("product_photo_failed", extra={"reason": str(exc)})
+        await show_screen(event, text, markup)
+        return
+
+    if not fits:
+        chunks = split_text(text[len(caption) :].strip() or text)
+        for index, chunk in enumerate(chunks):
+            await message.answer(
+                chunk, reply_markup=markup if index == len(chunks) - 1 else None
+            )
 
 
 async def show_screen(

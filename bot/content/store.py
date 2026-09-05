@@ -14,7 +14,6 @@ from typing import Sequence
 
 from bot.content import loader
 from bot.content.schemas import (
-    ITEM_TO_CATEGORY,
     SECTION_DISPOSAL,
     SECTION_HOW_TO_USE,
     AstroSign,
@@ -91,7 +90,11 @@ class ContentSnapshot:
         return None
 
     def categories(self) -> list[tuple[str, str]]:
-        """Категории продуктов в порядке появления в файле: (код, подпись)."""
+        """Все категории в порядке появления в файле: (код, подпись).
+
+        Индекс в этом списке используется в callback_data, поэтому список
+        сквозной — и для категорий внутри групп, и для тех, что в корне.
+        """
         labels = self.texts.guide.categories
         ordered: list[tuple[str, str]] = []
         seen: set[str] = set()
@@ -102,19 +105,97 @@ class ContentSnapshot:
             ordered.append((product.category, labels.get(product.category, product.category)))
         return ordered
 
+    def groups(self) -> list[tuple[str, str]]:
+        """Группы верхнего уровня в порядке появления: (код, подпись)."""
+        labels = self.texts.guide.groups
+        ordered: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for product in self.active_products:
+            if not product.group or product.group in seen:
+                continue
+            seen.add(product.group)
+            ordered.append((product.group, labels.get(product.group, product.group)))
+        return ordered
+
+    def root_entries(self) -> list[tuple[str, str, str]]:
+        """Верхний уровень меню «Как пользоваться»: (вид, код, подпись).
+
+        Вид — group или category. Товары без группы показываются своей
+        категорией сразу в корне, остальные прячутся за группой.
+        """
+        group_labels = self.texts.guide.groups
+        category_labels = self.texts.guide.categories
+        entries: list[tuple[str, str, str]] = []
+        seen: set[tuple[str, str]] = set()
+
+        for product in self.active_products:
+            if product.group:
+                key = ("group", product.group)
+                label = group_labels.get(product.group, product.group)
+            else:
+                key = ("category", product.category)
+                label = category_labels.get(product.category, product.category)
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append((key[0], key[1], label))
+        return entries
+
+    def categories_in_group(self, group: str) -> list[tuple[str, str]]:
+        """Категории внутри группы: (код, подпись). Порядок как в файле."""
+        labels = self.texts.guide.categories
+        ordered: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for product in self.active_products:
+            if product.group != group or product.category in seen:
+                continue
+            seen.add(product.category)
+            ordered.append((product.category, labels.get(product.category, product.category)))
+        return ordered
+
+    def group_of_category(self, category: str) -> str:
+        for product in self.active_products:
+            if product.category == category:
+                return product.group
+        return ""
+
     def products_in_category(self, category: str) -> tuple[Product, ...]:
         return tuple(p for p in self.active_products if p.category == category)
 
-    def products_for_items(self, items: Sequence[str]) -> list[Product]:
-        """Продукты MALUNA, которые участвуют в ритуале.
+    def ritual_links(self, items: Sequence[str]) -> list[tuple[str, str, str]]:
+        """Куда ведут кнопки предметов под ритуалом: (вид, код, подпись).
 
-        Предметы из пятого вопроса — это категории, а не конкретные позиции,
-        поэтому показываем все активные продукты подходящих категорий.
+        Карта предмет → цель живёт в texts.yaml (ritual.item_links). Цель —
+        либо id конкретного товара, либо код группы: у «свечей MALUNA» нет
+        одной карточки, их 35, поэтому предмет ведёт в раздел «Свечи».
+        Предметы вроде душа и чая продуктами бренда не являются и в карте
+        отсутствуют, поэтому кнопок для них не будет.
         """
-        categories = [
-            ITEM_TO_CATEGORY[item] for item in items if item in ITEM_TO_CATEGORY
-        ]
-        return [product for product in self.active_products if product.category in categories]
+        links = self.texts.ritual.item_links
+        result: list[tuple[str, str, str]] = []
+        seen: set[tuple[str, str]] = set()
+
+        for item in items:
+            target = links.get(item)
+            if target is None:
+                continue
+
+            product = self.product(target)
+            if product is not None:
+                key = ("product", product.id)
+                label = product.name
+            elif any(code == target for code, _ in self.groups()):
+                key = ("group", target)
+                label = dict(self.groups())[target]
+            else:
+                logger.warning("ritual_item_link_unresolved", extra={"item_link": target})
+                continue
+
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append((key[0], key[1], label))
+        return result
 
     def faq_section(self, section: str) -> tuple[FaqItem, ...]:
         return tuple(

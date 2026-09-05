@@ -52,11 +52,14 @@ def ritual_question(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for index, option in enumerate(question.options):
+        # На кнопке — подпись из option_labels, если она задана; внутри
+        # остаётся ключ подбора из словаря ТЗ.
+        label = question.label(option)
         if question.multi:
-            label = f"{CHECKED_MARK}{option}" if option in selected else option
+            label = f"{CHECKED_MARK}{label}" if option in selected else label
             builder.button(text=label, callback_data=RitualCB(action="toggle", value=index))
         else:
-            builder.button(text=option, callback_data=RitualCB(action="pick", value=index))
+            builder.button(text=label, callback_data=RitualCB(action="pick", value=index))
     builder.adjust(1)
 
     if question.multi:
@@ -82,27 +85,36 @@ def ritual_question(
     return builder.as_markup()
 
 
-def ritual_result(
-    texts: Texts, content: ContentSnapshot, product_ids: list[str], has_alternative: bool
-) -> InlineKeyboardMarkup:
-    """Продукты ритуала ведут в карточку справочника, ниже — навигация."""
-    builder = InlineKeyboardBuilder()
+def _product_callback(content: ContentSnapshot, product_id: str) -> GuideCB | None:
+    """Кнопка, открывающая карточку товара в справочнике."""
+    product = content.product(product_id)
+    if product is None:
+        return None
     categories = [code for code, _ in content.categories()]
-    for product_id in product_ids:
-        product = content.product(product_id)
-        if product is None:
-            continue
-        products = content.products_in_category(product.category)
-        builder.row(
-            InlineKeyboardButton(
-                text=product.name,
-                callback_data=GuideCB(
-                    action="product",
-                    value=[p.id for p in products].index(product.id),
-                    extra=categories.index(product.category),
-                ).pack(),
-            )
-        )
+    products = [p.id for p in content.products_in_category(product.category)]
+    return GuideCB(
+        action="product",
+        value=products.index(product.id),
+        extra=categories.index(product.category),
+    )
+
+
+def _link_callback(content: ContentSnapshot, kind: str, code: str) -> GuideCB | None:
+    if kind == "product":
+        return _product_callback(content, code)
+    groups = [group for group, _ in content.groups()]
+    return GuideCB(action="group", value=groups.index(code)) if code in groups else None
+
+
+def ritual_result(
+    texts: Texts, content: ContentSnapshot, links: list[tuple[str, str, str]], has_alternative: bool
+) -> InlineKeyboardMarkup:
+    """Предметы ритуала ведут в справочник, ниже — навигация."""
+    builder = InlineKeyboardBuilder()
+    for kind, code, label in links:
+        callback = _link_callback(content, kind, code)
+        if callback is not None:
+            builder.row(InlineKeyboardButton(text=label, callback_data=callback.pack()))
 
     navigation: list[InlineKeyboardButton] = []
     if has_alternative:
@@ -141,22 +153,11 @@ def astro_result(
     texts: Texts, content: ContentSnapshot, product_ids: list[str]
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    categories = [code for code, _ in content.categories()]
     for product_id in product_ids:
         product = content.product(product_id)
-        if product is None:
-            continue
-        products = content.products_in_category(product.category)
-        builder.row(
-            InlineKeyboardButton(
-                text=product.name,
-                callback_data=GuideCB(
-                    action="product",
-                    value=[p.id for p in products].index(product.id),
-                    extra=categories.index(product.category),
-                ).pack(),
-            )
-        )
+        callback = _product_callback(content, product_id)
+        if product is not None and callback is not None:
+            builder.row(InlineKeyboardButton(text=product.name, callback_data=callback.pack()))
     builder.row(
         InlineKeyboardButton(
             text=texts.astro.another_date, callback_data=AstroCB(action="again").pack()
@@ -178,32 +179,68 @@ def guide_root(texts: Texts) -> InlineKeyboardMarkup:
 
 
 def guide_how_to_use(texts: Texts, content: ContentSnapshot) -> InlineKeyboardMarkup:
-    """Общие карточки сверху, ниже — категории продуктов из products.yaml."""
+    """Общие карточки сверху, ниже — верхний уровень каталога.
+
+    Товары со своей группой прячутся за кнопкой группы, остальные
+    показываются категорией сразу здесь.
+    """
     builder = InlineKeyboardBuilder()
     for index, item in enumerate(content.how_to_use_faq):
         builder.button(text=item.question, callback_data=GuideCB(action="faq", value=index))
-    for index, (_, label) in enumerate(content.categories()):
-        builder.button(text=label, callback_data=GuideCB(action="category", value=index))
+
+    categories = [code for code, _ in content.categories()]
+    groups = [code for code, _ in content.groups()]
+    for kind, code, label in content.root_entries():
+        index = groups.index(code) if kind == "group" else categories.index(code)
+        builder.button(text=label, callback_data=GuideCB(action=kind, value=index))
+
     builder.adjust(1)
     builder.row(_back_to_guide(texts), _to_menu_button(texts))
     return builder.as_markup()
 
 
-def guide_category(texts: Texts, content: ContentSnapshot, category_index: int) -> InlineKeyboardMarkup:
-    categories = content.categories()
+def guide_group(texts: Texts, content: ContentSnapshot, group_index: int) -> InlineKeyboardMarkup:
+    """Категории внутри группы, например подвиды свечей."""
+    groups = content.groups()
+    categories = [code for code, _ in content.categories()]
     builder = InlineKeyboardBuilder()
-    if 0 <= category_index < len(categories):
-        products = content.products_in_category(categories[category_index][0])
-        for index, product in enumerate(products):
+
+    if 0 <= group_index < len(groups):
+        for code, label in content.categories_in_group(groups[group_index][0]):
             builder.button(
-                text=product.name,
-                callback_data=GuideCB(action="product", value=index, extra=category_index),
+                text=label, callback_data=GuideCB(action="category", value=categories.index(code))
             )
     builder.adjust(1)
     builder.row(
         InlineKeyboardButton(
             text=texts.common.back, callback_data=GuideCB(action="howto").pack()
         ),
+        _to_menu_button(texts),
+    )
+    return builder.as_markup()
+
+
+def guide_category(texts: Texts, content: ContentSnapshot, category_index: int) -> InlineKeyboardMarkup:
+    categories = content.categories()
+    builder = InlineKeyboardBuilder()
+    back = GuideCB(action="howto")
+
+    if 0 <= category_index < len(categories):
+        code = categories[category_index][0]
+        for index, product in enumerate(content.products_in_category(code)):
+            builder.button(
+                text=product.name,
+                callback_data=GuideCB(action="product", value=index, extra=category_index),
+            )
+        # Внутри группы «Назад» ведёт в группу, а не сразу в начало.
+        group = content.group_of_category(code)
+        if group:
+            group_index = [g for g, _ in content.groups()].index(group)
+            back = GuideCB(action="group", value=group_index)
+
+    builder.adjust(1)
+    builder.row(
+        InlineKeyboardButton(text=texts.common.back, callback_data=back.pack()),
         _to_menu_button(texts),
     )
     return builder.as_markup()

@@ -26,6 +26,9 @@ from aiogram.types import (
 USER_ID = 424242
 CHAT_ID = 424242
 
+# Методы, которыми бот рисует экран.
+_TEXT_METHODS = frozenset({"SendMessage", "EditMessageText", "SendPhoto"})
+
 _user = User(id=USER_ID, is_bot=False, first_name="Tester")
 _chat = Chat(id=CHAT_ID, type="private")
 
@@ -53,14 +56,15 @@ class FakeSession(BaseSession):
                 return ChatMemberMember(status="member", user=_user)
             return ChatMemberLeft(status="left", user=_user)
 
-        if name in {"SendMessage", "EditMessageText"}:
+        if name in {"SendMessage", "EditMessageText", "SendPhoto"}:
             self._message_id += 1
             return Message(
                 message_id=self._message_id,
                 date=datetime.now(tz=timezone.utc),
                 chat=_chat,
                 from_user=_user,
-                text=getattr(method, "text", ""),
+                text=getattr(method, "text", None),
+                caption=getattr(method, "caption", None),
                 reply_markup=getattr(method, "reply_markup", None),
             )
 
@@ -85,14 +89,31 @@ class FakeSession(BaseSession):
             if type(call).__name__ in {"SendMessage", "EditMessageText"}
         ]
 
+    def captions_and_texts(self) -> str:
+        """Всё, что бот отправил на последнем шаге, включая подписи к фото."""
+        parts = [
+            getattr(call, "text", None) or getattr(call, "caption", None) or ""
+            for call in self.calls
+            if type(call).__name__ in _TEXT_METHODS
+        ]
+        return "\n".join(parts)
+
     def last_text(self) -> str:
-        texts = self.sent_texts()
-        assert texts, "bot sent no messages"
-        return texts[-1]
+        """Текст последнего экрана. У карточки с фото это подпись."""
+        for call in reversed(self.calls):
+            if type(call).__name__ in _TEXT_METHODS:
+                return getattr(call, "text", None) or getattr(call, "caption", None) or ""
+        raise AssertionError("bot sent no messages")
 
     def last_markup(self) -> InlineKeyboardMarkup | None:
+        """Клавиатура последнего экрана.
+
+        Правка снятия кнопок со старого сообщения (EditMessageReplyMarkup)
+        экраном не считается — иначе фото-карточка выглядела бы как экран
+        без кнопок.
+        """
         for call in reversed(self.calls):
-            if type(call).__name__ in {"SendMessage", "EditMessageText"}:
+            if type(call).__name__ in _TEXT_METHODS:
                 return getattr(call, "reply_markup", None)
         return None
 

@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -47,7 +48,9 @@ COLUMNS = {
     "настроение": "mood",
     "что хочется": "desire",
     "нужные продукты": "items",
+    "нужные продукты / предметы": "items",
     "название": "title",
+    "название ритуала": "title",
     "текст ритуала": "text",
     "текст": "text",
     "активен": "active",
@@ -120,6 +123,85 @@ def _as_bool(value: Any) -> bool:
 
 
 def read_rows(path: Path) -> list[dict[str, Any]]:
+    if path.suffix.lower() in {".md", ".markdown"}:
+        return read_markdown_rows(path)
+    return read_xlsx_rows(path)
+
+
+def read_markdown_rows(path: Path) -> list[dict[str, Any]]:
+    """Читает выгрузку вида MALUNA_rituals.md.
+
+    Поля берутся из сводной таблицы в начале файла, текст ритуала — из
+    раздела «Ритуалы» ниже. Связка по номеру: «### 3. Название».
+    """
+    text = path.read_text(encoding="utf-8")
+
+    header_line = next(
+        (line for line in text.splitlines() if re.match(r"^\|\s*ID\s*\|", line, re.I)), None
+    )
+    if header_line is None:
+        raise ImportError_("в файле нет сводной таблицы (строки, начинающейся с «| ID |»)")
+
+    mapping: dict[int, str] = {}
+    for index, title in enumerate(header_line.strip().strip("|").split("|")):
+        key = title.strip().lower().split("/")[0].strip()
+        if key in COLUMNS:
+            mapping[index] = COLUMNS[key]
+
+    missing = {"id", "duration_min", "desire", "title"} - set(mapping.values())
+    if missing:
+        raise ImportError_(f"в сводной таблице не хватает колонок: {', '.join(sorted(missing))}")
+
+    texts = _markdown_texts(text)
+
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not re.match(r"^\|\s*\d+\s*\|", line):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+        entry: dict[str, Any] = {"__line": line_number}
+        for index, field in mapping.items():
+            value = cells[index] if index < len(cells) else ""
+            if field in LIST_FIELDS:
+                entry[field] = _split(value)
+            elif field == "active":
+                entry[field] = _as_bool(value)
+            else:
+                entry[field] = _clean(value)
+
+        body = texts.get(_clean(entry.get("id")))
+        if not body:
+            raise ImportError_(
+                f"строка {line_number}: в разделе «Ритуалы» нет текста для ID {entry.get('id')!r}"
+            )
+        entry["text"] = body
+        entry.setdefault("active", True)
+        rows.append(entry)
+
+    if not rows:
+        raise ImportError_("в сводной таблице нет ни одной строки с данными")
+    return rows
+
+
+def _markdown_texts(text: str) -> dict[str, str]:
+    """Тексты ритуалов из блоков «### N. Название»: {номер: текст}."""
+    result: dict[str, str] = {}
+    for match in re.finditer(r"^### (\d+)\.\s*(.+?)$", text, re.M):
+        start = match.end()
+        following = re.search(r"^(?:###|##|#) ", text[start:], re.M)
+        block = text[start : start + following.start()] if following else text[start:]
+        # Внутри блока сначала идут поля списком, текст — после них.
+        body = "\n".join(
+            line for line in block.splitlines() if not line.lstrip().startswith("- **")
+        )
+        body = body.replace("---", "").strip()
+        if body:
+            result[match.group(1)] = body
+    return result
+
+
+def read_xlsx_rows(path: Path) -> list[dict[str, Any]]:
     workbook = load_workbook(path, data_only=True)
     if SHEET_NAME not in workbook.sheetnames:
         available = ", ".join(workbook.sheetnames)

@@ -6,6 +6,9 @@ python-dotenv==1.0.1
 aiohttp==3.11.11
 openpyxl==3.1.5
 
+# Конвертация картинок каталога webp → jpg в scripts/import_catalog.py
+Pillow==12.3.0
+
 # Опционально: FSM в Redis вместо памяти (включается переменной REDIS_URL)
 redis==5.2.1
 

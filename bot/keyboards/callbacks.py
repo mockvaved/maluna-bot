@@ -37,9 +37,9 @@ class AstroCB(CallbackData, prefix="a"):
 class GuideCB(CallbackData, prefix="g"):
     """Разделы справочника.
 
-    action: root | howto | category | product | practices | practice |
-            disposal | faq
-    value:  индекс категории / продукта / практики / карточки FAQ
+    action: root | howto | group | category | product | practices |
+            practice | disposal | faq
+    value:  индекс группы / категории / продукта / практики / карточки FAQ
     extra:  индекс категории, когда открываем продукт внутри неё
     """
 
