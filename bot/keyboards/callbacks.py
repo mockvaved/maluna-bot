@@ -34,6 +34,12 @@ class AstroCB(CallbackData, prefix="a"):
     action: str
 
 
+class GiftCB(CallbackData, prefix="gift"):
+    """Подарок за отзыв. action: again (другая дата)"""
+
+    action: str
+
+
 class GuideCB(CallbackData, prefix="g"):
     """Разделы справочника.
 

@@ -26,7 +26,7 @@ from bot.content.loader import ContentError
 from bot.content.store import ContentStore
 from bot.db.database import Database
 from bot.db.repo import Repository
-from bot.handlers import about, admin, astro, fallback, guide, prediction, ritual, start
+from bot.handlers import about, admin, astro, fallback, gift, guide, prediction, ritual, start
 from bot.health import start_health_server
 from bot.logging_setup import setup_logging
 from bot.middlewares.errors import ErrorMiddleware
@@ -74,6 +74,7 @@ def build_dispatcher(
     dispatcher.include_router(prediction.router)
     dispatcher.include_router(ritual.router)
     dispatcher.include_router(astro.router)
+    dispatcher.include_router(gift.router)
     dispatcher.include_router(guide.router)
     dispatcher.include_router(about.router)
     # Последним: ловит свободный текст и кнопки из устаревших сообщений.

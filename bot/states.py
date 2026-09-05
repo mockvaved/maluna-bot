@@ -21,6 +21,13 @@ class AstroFlow(StatesGroup):
     waiting_for_date = State()
 
 
+class GiftFlow(StatesGroup):
+    """Подарок за отзыв: сначала фото, потом дата рождения."""
+
+    waiting_for_photo = State()
+    waiting_for_date = State()
+
+
 class DeleteFlow(StatesGroup):
     """Подтверждение команды /delete."""
 
@@ -34,6 +41,8 @@ KEY_ANSWERS = "answers"
 KEY_RANKED = "ranked"
 KEY_SHOWN_RITUALS = "shown_rituals"
 
-# Астропрогноз: хранится только вычисленный знак, дата рождения — никогда.
+# Астропрогноз и подарок за отзыв: хранится только результат вычисления —
+# знак зодиака или цифра года. Дата рождения не сохраняется никогда.
 KEY_ATTEMPTS = "attempts"
 KEY_SIGN = "sign"
+KEY_PERSONAL_YEAR = "personal_year"

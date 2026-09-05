@@ -7,7 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.content.schemas import Product, RitualQuestion, Texts
 from bot.content.store import ContentSnapshot
-from bot.keyboards.callbacks import AstroCB, DeleteCB, GuideCB, MenuCB, RitualCB
+from bot.keyboards.callbacks import AstroCB, DeleteCB, GiftCB, GuideCB, MenuCB, RitualCB
 
 CHECKED_MARK = "✅ "
 
@@ -26,6 +26,7 @@ def main_menu(texts: Texts) -> InlineKeyboardMarkup:
         ("prediction", buttons.prediction),
         ("ritual", buttons.ritual),
         ("astro", buttons.astro),
+        ("gift", buttons.gift),
         ("guide", buttons.guide),
         ("about", buttons.about),
     ):
@@ -171,6 +172,28 @@ def astro_result(
     builder.row(
         InlineKeyboardButton(
             text=texts.astro.another_date, callback_data=AstroCB(action="again").pack()
+        ),
+        _to_menu_button(texts),
+    )
+    return builder.as_markup()
+
+
+def gift_result(
+    texts: Texts, content: ContentSnapshot, product_ids: list[str]
+) -> InlineKeyboardMarkup:
+    """Экран нумерологического прогноза: товары, другая дата, меню."""
+    builder = InlineKeyboardBuilder()
+    for product_id in product_ids:
+        product = content.product(product_id)
+        callback = _product_callback(content, product_id)
+        if product is None or callback is None:
+            continue
+        builder.row(InlineKeyboardButton(text=product.name, callback_data=callback.pack()))
+        if buy := _buy_button(texts, product):
+            builder.row(buy)
+    builder.row(
+        InlineKeyboardButton(
+            text=texts.astro.another_date, callback_data=GiftCB(action="again").pack()
         ),
         _to_menu_button(texts),
     )

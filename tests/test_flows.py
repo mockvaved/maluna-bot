@@ -18,19 +18,28 @@ from tests.fake_telegram import (
     USER_ID,
     FakeSession,
     make_callback_update,
+    make_document_update,
     make_message_update,
+    make_photo_update,
 )
 
 ADMIN_ID = USER_ID
 
 
 class Harness:
-    def __init__(self, bot: Bot, dispatcher, session: FakeSession, repo: Repository) -> None:
+    def __init__(
+        self, bot: Bot, dispatcher, session: FakeSession, repo: Repository, data_dir: Path
+    ) -> None:
         self.bot = bot
         self.dispatcher = dispatcher
         self.session = session
         self.repo = repo
+        self.data_dir = data_dir
         self._update_id = 0
+
+    @property
+    def review_files(self) -> list[Path]:
+        return sorted((self.data_dir / "reviews").glob("*"))
 
     def _next_id(self) -> int:
         self._update_id += 1
@@ -46,6 +55,16 @@ class Harness:
         self.session.reset()
         await self.dispatcher.feed_update(self.bot, make_callback_update(data, self._next_id()))
 
+    async def send_photo(self) -> None:
+        self.session.reset()
+        await self.dispatcher.feed_update(self.bot, make_photo_update(self._next_id()))
+
+    async def send_document(self, mime_type: str = "image/png") -> None:
+        self.session.reset()
+        await self.dispatcher.feed_update(
+            self.bot, make_document_update(self._next_id(), mime_type)
+        )
+
     @property
     def text(self) -> str:
         return self.session.last_text()
@@ -55,11 +74,14 @@ class Harness:
         return self.session.button_labels()
 
 
-def make_config(admin_ids: frozenset[int]) -> Config:
+def make_config(admin_ids: frozenset[int], data_dir: Path | None = None) -> Config:
+    """Конфиг теста. db_path задаёт и папку данных: рядом с базой бот
+    складывает фото отзывов, и в тестах она должна быть временной."""
     return Config(
         bot_token="42:TEST",
         admin_ids=admin_ids,
         content_dir=PROJECT_ROOT / "content",
+        db_path=(data_dir or PROJECT_ROOT / "data") / "flows.db",
     )
 
 
@@ -85,14 +107,14 @@ async def app(tmp_path: Path, dispatcher):
     # Каждый тест начинает с чистой базы, без чужого кеша подписки и с
     # админскими правами по умолчанию.
     dispatcher["repo"] = repo
-    dispatcher["config"] = make_config(frozenset({ADMIN_ID}))
+    dispatcher["config"] = make_config(frozenset({ADMIN_ID}), tmp_path)
     dispatcher["subscription"].forget(USER_ID)
     # MemoryStorage.close() ничего не чистит, поэтому состояние диалога
     # сбрасываем сами — иначе оно перетекает между тестами.
     dispatcher.storage.storage.clear()
 
     try:
-        yield Harness(bot, dispatcher, session, repo)
+        yield Harness(bot, dispatcher, session, repo, tmp_path)
     finally:
         await db.close()
 
@@ -106,6 +128,7 @@ async def test_start_shows_welcome_and_menu(app: Harness) -> None:
         "🕯 Предсказание",
         "✨ Собери свой ритуал",
         "🔮 Астропрогноз 2027",
+        "🎁 Подарок за отзыв",
         "📖 Справочник",
         "💜 О бренде",
     ]
@@ -316,6 +339,138 @@ async def test_birth_date_never_reaches_the_database(app: Harness) -> None:
     assert "14.03" not in joined
     assert "1990" not in joined
     assert "Рыбы" in joined  # знак сохранить можно, дату — нет
+
+
+# ── Подарок за отзыв ────────────────────────────────────────────────
+async def test_gift_full_path_photo_then_date(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+
+    assert "отзыв" in app.text.lower()
+    assert "Фото сохраняем" in app.text  # честно предупреждаем
+
+    await app.send_photo()
+    assert "дату рождения" in app.text
+
+    await app.send("15.06")
+    assert "5 — год перемен" in app.text
+    assert "Пятёрка ломает расписание" in app.text
+    assert "Другая дата" in app.buttons
+
+
+async def test_gift_saves_the_photo_to_disk_and_db(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+
+    files = app.review_files
+    assert len(files) == 1
+    assert files[0].read_bytes() == app.session.file_bytes
+    assert str(USER_ID) in files[0].name
+    assert await app.repo.has_review(USER_ID) is True
+
+
+async def test_gift_asks_for_the_photo_only_once(app: Harness) -> None:
+    """Подарок отдаётся один раз: со второго захода сразу дата."""
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+    await app.send("15.06")
+
+    await app.press("В меню")
+    await app.press("🎁 Подарок за отзыв")
+
+    assert "дату рождения" in app.text
+    assert "фото" not in app.text.lower()
+
+
+async def test_gift_accepts_a_picture_sent_as_a_file(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_document("image/png")
+
+    assert await app.repo.has_review(USER_ID) is True
+
+
+async def test_gift_rejects_a_file_that_is_not_a_picture(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_document("application/pdf")
+
+    assert "картинка" in app.text.lower()
+    assert await app.repo.has_review(USER_ID) is False
+
+
+async def test_gift_asks_again_when_text_arrives_instead_of_a_photo(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+
+    await app.send("вот мой отзыв, честно")
+    assert "картинка" in app.text.lower()
+
+    await app.send("ну правда")
+    assert "картинка" in app.text.lower()
+
+    await app.send("ладно")
+    assert "🕯 Предсказание" in app.buttons  # третья попытка — в меню
+
+
+async def test_gift_survives_a_broken_download(app: Harness) -> None:
+    """Сеть отвалилась при скачивании — экран не ломается."""
+    app.session.fail_download = RuntimeError("network is down")
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+
+    assert "не получилось" in app.text.lower()
+    assert await app.repo.has_review(USER_ID) is False
+    assert app.review_files == []
+
+
+async def test_gift_never_stores_the_birth_date(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+    await app.send("15.06.1990")
+
+    async with app.repo._db.connection.execute("SELECT payload_json FROM events") as cursor:
+        payloads = " ".join(row["payload_json"] for row in await cursor.fetchall())
+
+    assert "15.06" not in payloads
+    assert "1990" not in payloads
+    assert '"number": 5' in payloads  # цифру года сохранить можно
+
+
+async def test_delete_removes_the_review_photo_from_disk(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+    assert len(app.review_files) == 1
+
+    await app.send("/delete")
+    await app.press("Да, удалить")
+
+    assert app.review_files == []
+    assert await app.repo.has_review(USER_ID) is False
+
+
+async def test_reviews_command_shows_photos_to_admin(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("🎁 Подарок за отзыв")
+    await app.send_photo()
+
+    await app.send("/reviews")
+
+    assert "SendPhoto" in [type(call).__name__ for call in app.session.calls]
+    assert str(USER_ID) in app.session.captions_and_texts()
+
+
+async def test_reviews_command_is_silent_for_everyone_else(app: Harness) -> None:
+    app.dispatcher["config"] = make_config(frozenset(), app.data_dir)
+
+    await app.send("/reviews")
+
+    assert app.session.calls == []
 
 
 # ── Справочник ──────────────────────────────────────────────────────

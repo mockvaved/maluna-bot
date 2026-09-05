@@ -19,6 +19,7 @@ from bot.content.schemas import (
     AstroSign,
     Card,
     FaqItem,
+    NumerologyYear,
     Practice,
     Product,
     Replies,
@@ -39,6 +40,7 @@ class ContentSnapshot:
     astro: tuple[AstroSign, ...]
     faq: tuple[FaqItem, ...]
     practices: tuple[Practice, ...]
+    numerology: tuple[NumerologyYear, ...]
 
     # ── Активный контент: то, что реально показывается пользователю ──
     @property
@@ -87,6 +89,12 @@ class ContentSnapshot:
         for sign in self.astro:
             if sign.sign == sign_name:
                 return sign
+        return None
+
+    def personal_year(self, number: int) -> NumerologyYear | None:
+        for year in self.numerology:
+            if year.number == number:
+                return year
         return None
 
     def categories(self) -> list[tuple[str, str]]:
@@ -221,6 +229,7 @@ class ContentSnapshot:
             "astro_signs": len(self.astro),
             "faq": len(self.faq),
             "practices": len(self.active_practices),
+            "numerology": len(self.numerology),
         }
 
 
@@ -235,7 +244,26 @@ def load_snapshot(content_dir: Path) -> ContentSnapshot:
         astro=tuple(loader.load_list(content_dir, "astro_2027", AstroSign)),
         faq=tuple(loader.load_list(content_dir, "faq", FaqItem)),
         practices=tuple(loader.load_list(content_dir, "practices", Practice)),
+        numerology=_check_numerology(
+            tuple(loader.load_list(content_dir, "numerology_2027", NumerologyYear))
+        ),
     )
+
+
+def _check_numerology(years: tuple[NumerologyYear, ...]) -> tuple[NumerologyYear, ...]:
+    """Разборов должно быть ровно девять, по одному на цифру 1–9.
+
+    Пропуск любой цифры оставил бы часть людей без прогноза, поэтому
+    проверяем на старте, а не в момент, когда человек прислал дату.
+    """
+    numbers = {year.number for year in years}
+    missing = sorted(set(range(1, 10)) - numbers)
+    if missing:
+        raise loader.ContentError(
+            "numerology_2027: missing entries for numbers "
+            + ", ".join(str(number) for number in missing)
+        )
+    return years
 
 
 class ContentStore:

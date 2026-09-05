@@ -11,6 +11,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from bot.db.database import Database
 
@@ -26,6 +27,14 @@ _FORBIDDEN_PAYLOAD_KEYS = frozenset(
 class HistoryEntry:
     card_id: str
     shown_on: date
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewPhoto:
+    user_id: int
+    file_id: str
+    file_path: str
+    created_at: str
 
 
 def _now() -> str:
@@ -110,12 +119,71 @@ class Repository:
         )
         await self._db.connection.commit()
 
+    # ── review_photos ───────────────────────────────────────────────
+    async def add_review_photo(self, user_id: int, file_id: str, file_path: str) -> None:
+        await self._db.connection.execute(
+            """
+            INSERT INTO review_photos (user_id, file_id, file_path, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, file_id, file_path, _now()),
+        )
+        await self._db.connection.commit()
+
+    async def has_review(self, user_id: int) -> bool:
+        """Присылал ли человек отзыв. Подарок отдаётся один раз и навсегда."""
+        async with self._db.connection.execute(
+            "SELECT 1 FROM review_photos WHERE user_id = ? LIMIT 1", (user_id,)
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+    async def recent_reviews(self, limit: int = 10) -> list[ReviewPhoto]:
+        async with self._db.connection.execute(
+            """
+            SELECT user_id, file_id, file_path, created_at
+            FROM review_photos ORDER BY created_at DESC LIMIT ?
+            """,
+            (limit,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [
+            ReviewPhoto(row["user_id"], row["file_id"], row["file_path"], row["created_at"])
+            for row in rows
+        ]
+
+    async def review_count(self) -> int:
+        async with self._db.connection.execute("SELECT COUNT(*) AS n FROM review_photos") as cursor:
+            row = await cursor.fetchone()
+        return int(row["n"]) if row else 0
+
     # ── /delete ─────────────────────────────────────────────────────
-    async def delete_user(self, user_id: int) -> None:
-        """Стирает всё, что связано с пользователем. Необратимо."""
+    async def delete_user(self, user_id: int, media_root: Path | None = None) -> None:
+        """Стирает всё, что связано с пользователем. Необратимо.
+
+        Фото отзывов удаляются и из базы, и с диска: иначе после /delete
+        картинка человека осталась бы лежать в data/reviews/.
+        """
         connection = self._db.connection
+
+        if media_root is not None:
+            async with connection.execute(
+                "SELECT file_path FROM review_photos WHERE user_id = ?", (user_id,)
+            ) as cursor:
+                paths = [row["file_path"] for row in await cursor.fetchall()]
+            for relative in paths:
+                _remove_file(media_root / relative)
+
+        await connection.execute("DELETE FROM review_photos WHERE user_id = ?", (user_id,))
         await connection.execute("DELETE FROM user_card_history WHERE user_id = ?", (user_id,))
         await connection.execute("DELETE FROM events WHERE user_id = ?", (user_id,))
         await connection.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
         await connection.commit()
         logger.info("user_data_deleted", extra={"user_id": user_id})
+
+
+def _remove_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        # Файл мог быть удалён руками — на удаление данных это не влияет.
+        logger.warning("review_photo_delete_failed", extra={"file": path.name})

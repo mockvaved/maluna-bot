@@ -172,6 +172,21 @@ class AstroSign(ContentModel):
         return value
 
 
+# ── numerology_2027 ─────────────────────────────────────────────────
+class NumerologyYear(ContentModel):
+    """Разбор личного года по цифре от 1 до 9."""
+
+    number: int = Field(ge=1, le=9)
+    title: NonEmptyStr
+    text: NonEmptyStr
+    product_ids: list[str] = Field(default_factory=list)
+
+    @property
+    def id(self) -> int:
+        # Загрузчик проверяет уникальность по полю id.
+        return self.number
+
+
 # ── faq ─────────────────────────────────────────────────────────────
 class FaqItem(ContentModel):
     id: NonEmptyStr
@@ -208,8 +223,22 @@ class MenuButtons(ContentModel):
     prediction: NonEmptyStr
     ritual: NonEmptyStr
     astro: NonEmptyStr
+    gift: NonEmptyStr
     guide: NonEmptyStr
     about: NonEmptyStr
+
+
+class GiftTexts(ContentModel):
+    """Подарок за отзыв."""
+
+    ask_photo: NonEmptyStr
+    photo_note: NonEmptyStr
+    photo_saved: NonEmptyStr
+    not_a_photo: NonEmptyStr
+    save_failed: NonEmptyStr
+    too_many_attempts: NonEmptyStr
+    ask_date: NonEmptyStr
+    forecast: NonEmptyStr
 
 
 class MenuTexts(ContentModel):
@@ -343,6 +372,8 @@ class DeleteTexts(ContentModel):
 class AdminTexts(ContentModel):
     reload_ok: NonEmptyStr
     reload_failed: NonEmptyStr
+    reviews_empty: NonEmptyStr
+    reviews_caption: NonEmptyStr
 
 
 class Texts(ContentModel):
@@ -352,6 +383,7 @@ class Texts(ContentModel):
     prediction: PredictionTexts
     ritual: RitualTexts
     astro: AstroTexts
+    gift: GiftTexts
     guide: GuideTexts
     about: NonEmptyStr
     about_site_button: NonEmptyStr
@@ -390,6 +422,7 @@ __all__ = [
     "AstroSign",
     "Card",
     "FaqItem",
+    "NumerologyYear",
     "Practice",
     "Product",
     "Replies",

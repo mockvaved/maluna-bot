@@ -138,4 +138,5 @@ def _snapshot_with(pool: tuple[Card, ...]) -> ContentSnapshot:
         astro=base.astro,
         faq=base.faq,
         practices=base.practices,
+        numerology=base.numerology,
     )

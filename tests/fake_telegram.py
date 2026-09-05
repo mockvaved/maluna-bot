@@ -17,8 +17,11 @@ from aiogram.types import (
     Chat,
     ChatMemberLeft,
     ChatMemberMember,
+    Document,
+    File,
     InlineKeyboardMarkup,
     Message,
+    PhotoSize,
     Update,
     User,
 )
@@ -41,6 +44,9 @@ class FakeSession(BaseSession):
         self.calls: list[TelegramMethod[Any]] = []
         self.member_status = "member"
         self.fail_get_chat_member: Exception | None = None
+        # Содержимое «скачиваемого» файла и способ сломать скачивание.
+        self.file_bytes = b"fake-jpeg-bytes"
+        self.fail_download: Exception | None = None
         self._message_id = 100
 
     async def make_request(
@@ -48,6 +54,14 @@ class FakeSession(BaseSession):
     ) -> Any:
         self.calls.append(method)
         name = type(method).__name__
+
+        if name == "GetFile":
+            return File(
+                file_id=getattr(method, "file_id", "file-1"),
+                file_unique_id="unique-1",
+                file_size=len(self.file_bytes),
+                file_path="photos/file_1.jpg",
+            )
 
         if name == "GetChatMember":
             if self.fail_get_chat_member is not None:
@@ -71,9 +85,11 @@ class FakeSession(BaseSession):
         # AnswerCallbackQuery, SetMyCommands, EditMessageReplyMarkup и прочее.
         return True
 
-    async def stream_content(self, *args: Any, **kwargs: Any):  # pragma: no cover
-        raise NotImplementedError
-        yield b""
+    async def stream_content(self, *args: Any, **kwargs: Any):
+        """Отдаёт байты «скачанного» файла — так работает bot.download_file."""
+        if self.fail_download is not None:
+            raise self.fail_download
+        yield self.file_bytes
 
     async def close(self) -> None:
         return None
@@ -150,6 +166,50 @@ def make_message_update(text: str, update_id: int = 1) -> Update:
             chat=_chat,
             from_user=_user,
             text=text,
+        ),
+    )
+
+
+def make_photo_update(update_id: int = 1, file_id: str = "photo-1") -> Update:
+    """Апдейт с фотографией — как когда человек присылает скриншот."""
+    return Update(
+        update_id=update_id,
+        message=Message(
+            message_id=update_id,
+            date=datetime.now(tz=timezone.utc),
+            chat=_chat,
+            from_user=_user,
+            photo=[
+                PhotoSize(
+                    file_id=file_id,
+                    file_unique_id=f"{file_id}-u",
+                    width=800,
+                    height=600,
+                    file_size=12345,
+                )
+            ],
+        ),
+    )
+
+
+def make_document_update(
+    update_id: int = 1, mime_type: str = "image/png", file_id: str = "doc-1"
+) -> Update:
+    """Апдейт с файлом: картинку часто присылают именно так."""
+    return Update(
+        update_id=update_id,
+        message=Message(
+            message_id=update_id,
+            date=datetime.now(tz=timezone.utc),
+            chat=_chat,
+            from_user=_user,
+            document=Document(
+                file_id=file_id,
+                file_unique_id=f"{file_id}-u",
+                mime_type=mime_type,
+                file_name="review.png",
+                file_size=23456,
+            ),
         ),
     )
 
