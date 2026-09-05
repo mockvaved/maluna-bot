@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from bot.content.schemas import RitualQuestion, Texts
+from bot.content.schemas import Product, RitualQuestion, Texts
 from bot.content.store import ContentSnapshot
 from bot.keyboards.callbacks import AstroCB, DeleteCB, GuideCB, MenuCB, RitualCB
 
@@ -149,6 +149,13 @@ def astro_cancel(texts: Texts) -> InlineKeyboardMarkup:
     )
 
 
+def _buy_button(texts: Texts, product: Product) -> InlineKeyboardButton | None:
+    """Кнопка на страницу товара. Нет ссылки или подписи — нет кнопки."""
+    if not product.url or not texts.guide.buy_button:
+        return None
+    return InlineKeyboardButton(text=texts.guide.buy_button, url=product.url)
+
+
 def astro_result(
     texts: Texts, content: ContentSnapshot, product_ids: list[str]
 ) -> InlineKeyboardMarkup:
@@ -156,8 +163,11 @@ def astro_result(
     for product_id in product_ids:
         product = content.product(product_id)
         callback = _product_callback(content, product_id)
-        if product is not None and callback is not None:
-            builder.row(InlineKeyboardButton(text=product.name, callback_data=callback.pack()))
+        if product is None or callback is None:
+            continue
+        builder.row(InlineKeyboardButton(text=product.name, callback_data=callback.pack()))
+        if buy := _buy_button(texts, product):
+            builder.row(buy)
     builder.row(
         InlineKeyboardButton(
             text=texts.astro.another_date, callback_data=AstroCB(action="again").pack()
@@ -266,16 +276,20 @@ def guide_disposal(texts: Texts, content: ContentSnapshot) -> InlineKeyboardMark
     return builder.as_markup()
 
 
-def guide_back(texts: Texts, back: GuideCB) -> InlineKeyboardMarkup:
-    """Клавиатура карточки: назад в список и в меню."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=texts.common.back, callback_data=back.pack()),
-                _to_menu_button(texts),
-            ]
+def guide_back(
+    texts: Texts, back: GuideCB, product: Product | None = None
+) -> InlineKeyboardMarkup:
+    """Клавиатура карточки: ссылка на товар сверху, ниже навигация."""
+    rows: list[list[InlineKeyboardButton]] = []
+    if product is not None and (buy := _buy_button(texts, product)):
+        rows.append([buy])
+    rows.append(
+        [
+            InlineKeyboardButton(text=texts.common.back, callback_data=back.pack()),
+            _to_menu_button(texts),
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _back_to_guide(texts: Texts) -> InlineKeyboardButton:

@@ -112,10 +112,15 @@ async def test_start_shows_welcome_and_menu(app: Harness) -> None:
 
 
 async def test_start_never_asks_anything(app: Harness) -> None:
-    """Ни онбординга, ни согласия, ни даты рождения на старте."""
+    """Ни онбординга, ни согласия, ни вопросов на старте.
+
+    Про дату рождения написать можно — но только что её не спрашивают.
+    """
     await app.send("/start")
-    assert "дат" not in app.text.lower()
+    lowered = app.text.lower()
     assert "?" not in app.text
+    for request in ("введи", "напиши", "укажи", "заполни", "согласен"):
+        assert request not in lowered, f"приветствие требует действия: {request}"
 
 
 async def test_start_rescues_a_stuck_user(app: Harness) -> None:
@@ -370,6 +375,42 @@ async def test_guide_two_level_path_to_a_product(app: Harness) -> None:
     assert "Астросвечи" in app.buttons
 
 
+async def test_astro_forecast_offers_the_candles_and_a_buy_link(app: Harness) -> None:
+    """После прогноза — свечи своего знака и ссылка на их страницу."""
+    await app.send("/start")
+    await app.press("🔮 Астропрогноз 2027")
+    await app.send("14.03")
+
+    assert "Рыбы" in app.text
+    assert "Астросвечи для Рыб" in app.buttons
+
+    buy = _url_button(app, "Купить")
+    assert buy is not None, f"кнопки покупки нет среди {app.buttons}"
+    assert buy.url.startswith("https://malunabeauty.ru/")
+
+
+async def test_product_card_has_a_buy_link(app: Harness) -> None:
+    await app.send("/start")
+    await app.press("📖 Справочник")
+    await app.press("Как пользоваться")
+    await app.press("Косметика")
+    await app.press("Гидрофильное масло")
+
+    buy = _url_button(app, "Купить")
+    assert buy is not None, f"кнопки покупки нет среди {app.buttons}"
+    assert "gidrofilnoe-maslo" in buy.url
+
+
+def _url_button(app: Harness, label_part: str):
+    markup = app.session.last_markup()
+    assert markup is not None, "у последнего экрана нет клавиатуры"
+    for row in markup.inline_keyboard:
+        for button in row:
+            if button.url and label_part in button.text:
+                return button
+    return None
+
+
 async def test_product_card_is_sent_with_a_photo(app: Harness) -> None:
     await app.send("/start")
     await app.press("📖 Справочник")
@@ -398,10 +439,12 @@ async def test_health_question_gets_a_soft_refusal(app: Harness) -> None:
 
 
 async def test_order_question_points_to_contacts(app: Harness) -> None:
+    """На вопрос про заказ бот отправляет на сайт, а не выдумывает ответ."""
     await app.send("/start")
     await app.send("когда будет доставка заказа?")
 
-    assert "не про покупки" in app.text
+    assert "сайт" in app.text.lower()
+    assert "malunabeauty.ru" in app.text
     assert "{contacts}" not in app.text  # подстановка сработала
 
 

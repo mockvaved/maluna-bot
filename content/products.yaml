@@ -4,7 +4,9 @@
 #  Файл собран скриптом scripts/import_catalog.py из KATALOG_MALUNA.md.
 #  Правки руками потеряются при следующем импорте — меняй выгрузку.
 #
-#  Цен и ссылок на магазин здесь нет и быть не должно: бот не продаёт.
+#  Цен в файле нет и быть не должно — их показывает сайт, не бот.
+#  url — страница товара, из неё под карточкой делается кнопка «Купить
+#  на сайте». Убрал ссылку — кнопка пропала.
 #
 #  group    — верхний уровень меню (пусто = товар сразу в корне)
 #  category — второй уровень
@@ -41,6 +43,7 @@
   photos:
     - media/cosmetic_hydrophilic_oil_1.jpg
     - media/cosmetic_hydrophilic_oil_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-614495042763-gidrofilnoe-maslo
   active: true
 - id: cosmetic_cleansing_gel
   name: Очищающий гель
@@ -68,6 +71,7 @@
   photos:
     - media/cosmetic_cleansing_gel_1.jpg
     - media/cosmetic_cleansing_gel_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-763100304553-ochischayuschii-gel
   active: true
 - id: cosmetic_moisturizer
   name: Увлажняющий крем
@@ -98,6 +102,7 @@
   photos:
     - media/cosmetic_moisturizer_1.jpg
     - media/cosmetic_moisturizer_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-679807865073-uvlazhnyayuschii-krem
   active: true
 - id: astro_gemini
   name: Астросвечи для Близнецов
@@ -122,6 +127,7 @@
     - media/astro_gemini_1.jpg
     - media/astro_gemini_2.jpg
     - media/astro_gemini_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-604213442243-astrosvechi-dlya-bliznetsov
   active: true
 - id: astro_libra
   name: Астросвечи для Весов
@@ -146,6 +152,7 @@
     - media/astro_libra_1.jpg
     - media/astro_libra_2.jpg
     - media/astro_libra_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-111101056943-astrosvechi-dlya-vesov
   active: true
 - id: astro_aquarius
   name: Астросвечи для Водолеев
@@ -170,6 +177,7 @@
     - media/astro_aquarius_1.jpg
     - media/astro_aquarius_2.jpg
     - media/astro_aquarius_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-421116544763-astrosvechi-dlya-vodoleev
   active: true
 - id: astro_virgo
   name: Астросвечи для Дев
@@ -194,6 +202,7 @@
     - media/astro_virgo_1.jpg
     - media/astro_virgo_2.jpg
     - media/astro_virgo_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-107577805883-astrosvechi-dlya-dev
   active: true
 - id: astro_capricorn
   name: Астросвечи для Козерогов
@@ -218,6 +227,7 @@
     - media/astro_capricorn_1.jpg
     - media/astro_capricorn_2.jpg
     - media/astro_capricorn_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-195958799653-astrosvechi-dlya-kozerogov
   active: true
 - id: astro_leo
   name: Астросвечи для Львов
@@ -242,6 +252,7 @@
     - media/astro_leo_1.jpg
     - media/astro_leo_2.jpg
     - media/astro_leo_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-752346980243-astrosvechi-dlya-lvov
   active: true
 - id: astro_aries
   name: Астросвечи для Овнов
@@ -266,6 +277,7 @@
     - media/astro_aries_1.jpg
     - media/astro_aries_2.jpg
     - media/astro_aries_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-364063009603-astrosvechi-dlya-ovnov
   active: true
 - id: astro_cancer
   name: Астросвечи для Раков
@@ -290,6 +302,7 @@
     - media/astro_cancer_1.jpg
     - media/astro_cancer_2.jpg
     - media/astro_cancer_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-914338088023-astrosvechi-dlya-rakov
   active: true
 - id: astro_pisces
   name: Астросвечи для Рыб
@@ -314,6 +327,7 @@
     - media/astro_pisces_1.jpg
     - media/astro_pisces_2.jpg
     - media/astro_pisces_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-824741006413-astrosvechi-dlya-rib
   active: true
 - id: astro_scorpio
   name: Астросвечи для Скорпионов
@@ -338,6 +352,7 @@
     - media/astro_scorpio_1.jpg
     - media/astro_scorpio_2.jpg
     - media/astro_scorpio_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-812857514323-astrosvechi-dlya-skorpionov
   active: true
 - id: astro_sagittarius
   name: Астросвечи для Стрельцов
@@ -362,6 +377,7 @@
     - media/astro_sagittarius_1.jpg
     - media/astro_sagittarius_2.jpg
     - media/astro_sagittarius_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-422411674093-astrosvechi-dlya-streltsov
   active: true
 - id: astro_taurus
   name: Астросвечи для Тельцов
@@ -387,6 +403,7 @@
     - media/astro_taurus_1.jpg
     - media/astro_taurus_2.jpg
     - media/astro_taurus_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-771023622493-astrosvechi-dlya-teltsov
   active: true
 - id: mono_rose
   name: Белые свечи с розой
@@ -404,6 +421,7 @@
   photos:
     - media/mono_rose_1.jpg
     - media/mono_rose_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-379402653053-belie-svechi-s-rozoi
   active: true
 - id: mono_thyme
   name: Голубые свечи с чабрецом
@@ -422,6 +440,7 @@
   photos:
     - media/mono_thyme_1.jpg
     - media/mono_thyme_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-735288649843-golubie-svechi-s-chabretsom
   active: true
 - id: mono_calendula
   name: Желтые свечи с календулой
@@ -440,6 +459,7 @@
   photos:
     - media/mono_calendula_1.jpg
     - media/mono_calendula_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-866564948973-zheltie-svechi-s-kalenduloi
   active: true
 - id: mono_basil
   name: Зеленые свечи с базиликом
@@ -457,6 +477,7 @@
   photos:
     - media/mono_basil_1.jpg
     - media/mono_basil_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-408691571043-zelenie-svechi-s-bazilikom
   active: true
 - id: mono_birch
   name: Коричневые свечи с березой
@@ -474,6 +495,7 @@
   photos:
     - media/mono_birch_1.jpg
     - media/mono_birch_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-967902158123-korichnevie-svechi-s-berezoi
   active: true
 - id: mono_mint
   name: Красные свечи с мятой
@@ -491,6 +513,7 @@
   photos:
     - media/mono_mint_1.jpg
     - media/mono_mint_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-876667589133-krasnie-svechi-s-myatoi
   active: true
 - id: mono_dandelion
   name: Оранжевые свечи с одуванчиком
@@ -509,6 +532,7 @@
   photos:
     - media/mono_dandelion_1.jpg
     - media/mono_dandelion_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-240581689263-oranzhevie-svechi-s-oduvanchikom
   active: true
 - id: mono_oregano
   name: Розовые свечи с душицей
@@ -526,6 +550,7 @@
   photos:
     - media/mono_oregano_1.jpg
     - media/mono_oregano_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-354063818653-rozovie-svechi-s-dushitsei
   active: true
 - id: mono_lavender
   name: Синие свечи с лавандой
@@ -544,6 +569,7 @@
   photos:
     - media/mono_lavender_1.jpg
     - media/mono_lavender_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-851365535553-sinie-svechi-s-lavandoi
   active: true
 - id: mono_sage
   name: Фиолетовые свечи с шалфеем
@@ -562,6 +588,7 @@
   photos:
     - media/mono_sage_1.jpg
     - media/mono_sage_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-165017156623-fioletovie-svechi-s-shalfeem
   active: true
 - id: mono_wormwood
   name: Черные свечи с полынью
@@ -579,6 +606,7 @@
   photos:
     - media/mono_wormwood_1.jpg
     - media/mono_wormwood_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-899466635623-chernie-svechi-s-polinyu
   active: true
 - id: mix_22
   name: Набор свечей №22
@@ -597,6 +625,7 @@
   photos:
     - media/mix_22_1.jpg
     - media/mix_22_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-558595354133-nabor-svechei-22
   active: true
 - id: mix_36
   name: Набор свечей №36
@@ -614,6 +643,7 @@
   photos:
     - media/mix_36_1.jpg
     - media/mix_36_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-213130257733-nabor-svechei-36
   active: true
 - id: mix_37
   name: Набор свечей №37
@@ -631,6 +661,7 @@
   photos:
     - media/mix_37_1.jpg
     - media/mix_37_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-863246864553-nabor-svechei-37
   active: true
 - id: mix_38
   name: Набор свечей №38
@@ -648,6 +679,7 @@
   photos:
     - media/mix_38_1.jpg
     - media/mix_38_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-459828486703-nabor-svechei-38
   active: true
 - id: mix_39
   name: Набор свечей №39
@@ -665,6 +697,7 @@
   photos:
     - media/mix_39_1.jpg
     - media/mix_39_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-663851689863-nabor-svechei-39
   active: true
 - id: mix_50
   name: Набор свечей №50
@@ -683,6 +716,7 @@
   photos:
     - media/mix_50_1.jpg
     - media/mix_50_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-385855359363-nabor-svechei-50
   active: true
 - id: twist_green
   name: Свечи-скрутки зеленые
@@ -701,6 +735,7 @@
   photos:
     - media/twist_green_1.jpg
     - media/twist_green_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-614730409413-svechi-skrutki-zelenie
   active: true
 - id: twist_red
   name: Свечи-скрутки красные
@@ -718,6 +753,7 @@
   photos:
     - media/twist_red_1.jpg
     - media/twist_red_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-689030591663-svechi-skrutki-krasnie
   active: true
 - id: twist_black
   name: Свечи-скрутки черные
@@ -735,6 +771,7 @@
   photos:
     - media/twist_black_1.jpg
     - media/twist_black_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-648369679353-svechi-skrutki-chernie
   active: true
 - id: set_dream
   name: Подарочный набор-конверт DREAM
@@ -760,6 +797,7 @@
     - media/set_dream_1.jpg
     - media/set_dream_2.jpg
     - media/set_dream_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-391893674653-podarochnii-nabor-konvert-dream
   active: true
 - id: set_love
   name: Подарочный набор-конверт LOVE
@@ -785,6 +823,7 @@
     - media/set_love_1.jpg
     - media/set_love_2.jpg
     - media/set_love_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-700199948313-podarochnii-nabor-konvert-love
   active: true
 - id: set_money
   name: Подарочный набор-письмо MONEY
@@ -810,6 +849,7 @@
     - media/set_money_1.jpg
     - media/set_money_2.jpg
     - media/set_money_3.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-413303885743-podarochnii-nabor-pismo-money
   active: true
 - id: cards_your_sign
   name: Аффирмационные карты "ТВОЙ ЗНАК"
@@ -832,4 +872,5 @@
   photos:
     - media/cards_your_sign_1.jpg
     - media/cards_your_sign_2.jpg
+  url: https://malunabeauty.ru/tproduct/2763697301-644764763973-affirmatsionnie-karti-tvoi-znak
   active: true

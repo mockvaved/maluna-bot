@@ -111,7 +111,7 @@ async def show_product(
     await repo.log_event(user_id_of(callback), "product_opened", {"product_id": product.id})
 
     body = _render_product(texts, product)
-    markup = guide_back(texts, GuideCB(action="category", value=callback_data.extra))
+    markup = guide_back(texts, GuideCB(action="category", value=callback_data.extra), product)
 
     if product.photo:
         await show_photo_screen(callback, config.content_dir / product.photo, body, markup)

@@ -127,7 +127,17 @@ class Product(ContentModel):
     mood_tags: list[str] = Field(default_factory=list)
     # Пути к картинкам относительно папки content. Показывается первая.
     photos: list[str] = Field(default_factory=list)
+    # Страница товара на сайте бренда. Под карточкой появляется кнопка,
+    # ведущая сюда. Пусто — кнопки не будет.
+    url: str = ""
     active: bool = True
+
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, value: str) -> str:
+        if value and not value.startswith(("http://", "https://")):
+            raise ValueError(f"product url must start with http:// or https://, got {value!r}")
+        return value
 
     @field_validator("description", "short_desc")
     @classmethod
@@ -313,6 +323,9 @@ class GuideTexts(ContentModel):
     product_how_to_use: NonEmptyStr
     product_care: NonEmptyStr
     product_disposal: NonEmptyStr
+    # Подпись кнопки на страницу товара. Пустая строка убирает кнопку
+    # со всех карточек разом.
+    buy_button: str = ""
     # Подписи для меню. Слева код из products.yaml, справа то, что видит человек.
     # Нет подписи — показывается сам код.
     groups: dict[str, str] = Field(default_factory=dict)
