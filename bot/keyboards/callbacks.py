@@ -28,8 +28,14 @@ class RitualCB(CallbackData, prefix="r"):
     value: int = -1
 
 
+class GateCB(CallbackData, prefix="gate"):
+    """Экран подписки. action: check (проверить подписку заново)"""
+
+    action: str
+
+
 class AstroCB(CallbackData, prefix="a"):
-    """action: check (проверить подписку) | again (другая дата) | start"""
+    """action: again (другая дата) | start"""
 
     action: str
 

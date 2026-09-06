@@ -325,11 +325,16 @@ class RitualTexts(ContentModel):
         return self
 
 
-class AstroTexts(ContentModel):
-    subscribe_required: NonEmptyStr
+class GateTexts(ContentModel):
+    """Экран для тех, кто ещё не подписан на канал бренда."""
+
+    intro: NonEmptyStr
+    not_yet: NonEmptyStr
     subscribe_button: NonEmptyStr
     check_button: NonEmptyStr
-    not_subscribed_yet: NonEmptyStr
+
+
+class AstroTexts(ContentModel):
     ask_date: NonEmptyStr
     privacy_note: NonEmptyStr
     invalid_date: NonEmptyStr
@@ -382,6 +387,7 @@ class Texts(ContentModel):
     common: CommonTexts
     prediction: PredictionTexts
     ritual: RitualTexts
+    gate: GateTexts
     astro: AstroTexts
     gift: GiftTexts
     guide: GuideTexts

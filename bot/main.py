@@ -26,10 +26,22 @@ from bot.content.loader import ContentError
 from bot.content.store import ContentStore
 from bot.db.database import Database
 from bot.db.repo import Repository
-from bot.handlers import about, admin, astro, fallback, gift, guide, prediction, ritual, start
+from bot.handlers import (
+    about,
+    admin,
+    astro,
+    fallback,
+    gate,
+    gift,
+    guide,
+    prediction,
+    ritual,
+    start,
+)
 from bot.health import start_health_server
 from bot.logging_setup import setup_logging
 from bot.middlewares.errors import ErrorMiddleware
+from bot.middlewares.subscription import SubscriptionMiddleware
 from bot.services.subscription import SubscriptionChecker
 
 logger = logging.getLogger(__name__)
@@ -63,12 +75,20 @@ def build_dispatcher(
     dispatcher["config"] = config
     dispatcher["content_store"] = content_store
     dispatcher["repo"] = repo
-    dispatcher["subscription"] = SubscriptionChecker(config.channel_username)
+    subscription = SubscriptionChecker(config.channel_username)
+    dispatcher["subscription"] = subscription
 
     error_middleware = ErrorMiddleware(content_store)
     dispatcher.message.middleware(error_middleware)
     dispatcher.callback_query.middleware(error_middleware)
 
+    # Шлюз идёт после перехватчика ошибок, чтобы сбои внутри него тоже
+    # ловились, и перед роутерами — неподписанный до них не доходит.
+    gate_middleware = SubscriptionMiddleware(content_store, config, subscription)
+    dispatcher.message.middleware(gate_middleware)
+    dispatcher.callback_query.middleware(gate_middleware)
+
+    dispatcher.include_router(gate.router)
     dispatcher.include_router(start.router)
     dispatcher.include_router(admin.router)
     dispatcher.include_router(prediction.router)

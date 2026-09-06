@@ -41,6 +41,20 @@ class Harness:
     def review_files(self) -> list[Path]:
         return sorted((self.data_dir / "reviews").glob("*"))
 
+    def as_regular_user(self) -> None:
+        """Снимает админские права: админы проходят шлюз без подписки."""
+        self.dispatcher["config"] = make_config(frozenset(), self.data_dir)
+
+    def unsubscribe(self) -> None:
+        """Человек не подписан на канал — и кеш об этом уже не помнит."""
+        self.as_regular_user()
+        self.session.member_status = "left"
+        self.dispatcher["subscription"].forget(USER_ID)
+
+    def subscribe(self) -> None:
+        self.session.member_status = "member"
+        self.dispatcher["subscription"].forget(USER_ID)
+
     def _next_id(self) -> int:
         self._update_id += 1
         return self._update_id
@@ -117,6 +131,103 @@ async def app(tmp_path: Path, dispatcher):
         yield Harness(bot, dispatcher, session, repo, tmp_path)
     finally:
         await db.close()
+
+
+# ── Шлюз: доступ только подписчикам канала ──────────────────────────
+async def test_gate_blocks_everything_for_a_non_subscriber(app: Harness) -> None:
+    app.unsubscribe()
+
+    await app.send("/start")
+
+    assert "открывается подписчикам" in app.text
+    assert app.buttons == ["Подписаться", "Я подписался"]
+    assert "🕯 Предсказание" not in app.buttons
+
+
+async def test_gate_explains_what_is_inside(app: Harness) -> None:
+    """Человек должен понимать, ради чего подписываться."""
+    app.unsubscribe()
+    await app.send("/start")
+
+    for feature in ("предсказание", "ритуал", "астропрогноз", "отзыв"):
+        assert feature in app.text.lower(), f"на экране шлюза нет упоминания: {feature}"
+
+
+async def test_gate_blocks_free_text_too(app: Harness) -> None:
+    app.unsubscribe()
+
+    await app.send("привет")
+
+    assert "открывается подписчикам" in app.text
+    assert "кнопками" not in app.text  # обычный ответ на свободный текст не сработал
+
+
+async def test_gate_lets_delete_through(app: Harness) -> None:
+    """Отписался — но стереть свои данные всё равно можно."""
+    await app.send("/start")
+    await app.press("🕯 Предсказание")
+    app.unsubscribe()
+
+    await app.send("/delete")
+    assert "необратим" in app.text
+
+    await app.press("Да, удалить")
+    assert await app.repo.card_history(USER_ID) == []
+
+
+async def test_gate_lets_admins_through(app: Harness) -> None:
+    app.session.member_status = "left"
+    app.dispatcher["subscription"].forget(USER_ID)
+
+    await app.send("/reload")
+
+    assert "перечитан" in app.text
+
+
+async def test_gate_opens_after_subscribing(app: Harness) -> None:
+    app.unsubscribe()
+    await app.send("/start")
+
+    # Человек подписался и вернулся нажать кнопку.
+    app.session.member_status = "member"
+    await app.press("Я подписался")
+
+    assert "MALUNA" in app.text
+    assert "🕯 Предсказание" in app.buttons
+
+
+async def test_gate_says_when_subscription_is_still_missing(app: Harness) -> None:
+    app.unsubscribe()
+    await app.send("/start")
+
+    await app.press("Я подписался")
+
+    assert "Пока не вижу подписки" in app.text
+    assert app.buttons == ["Подписаться", "Я подписался"]
+
+
+async def test_gate_opens_for_everyone_when_the_check_breaks(app: Harness) -> None:
+    """Бот не админ в канале — бот работает, а не запирается наглухо."""
+    app.as_regular_user()
+    app.dispatcher["subscription"].forget(USER_ID)
+    app.session.fail_get_chat_member = TelegramBadRequest(
+        method=GetChatMember(chat_id="@maluna118", user_id=USER_ID),
+        message="Bad Request: member list is inaccessible",
+    )
+
+    await app.send("/start")
+
+    assert "🕯 Предсказание" in app.buttons
+
+
+async def test_gate_result_is_cached(app: Harness) -> None:
+    """Подписку не спрашиваем на каждое нажатие."""
+    await app.send("/start")
+    await app.press("🕯 Предсказание")
+    await app.press("Вернуться в меню")
+
+    checks = [c for c in app.session.calls if type(c).__name__ == "GetChatMember"]
+    assert checks == [], "внутри одного сеанса проверка должна браться из кеша"
 
 
 # ── Старт и меню ────────────────────────────────────────────────────
@@ -274,13 +385,13 @@ async def test_another_option_gives_a_different_ritual(app: Harness) -> None:
 
 
 # ── Астропрогноз ────────────────────────────────────────────────────
-async def test_astro_asks_to_subscribe_when_not_a_member(app: Harness) -> None:
-    app.session.member_status = "left"
+async def test_astro_no_longer_gates_on_its_own(app: Harness) -> None:
+    """Подписку проверяет общий шлюз, раздел этим больше не занимается."""
     await app.send("/start")
     await app.press("🔮 Астропрогноз 2027")
 
-    assert "Подписаться" in app.buttons
-    assert "Я подписался" in app.buttons
+    assert "Дату мы не сохраняем" in app.text
+    assert "Подписаться" not in app.buttons
 
 
 async def test_astro_full_path_for_subscriber(app: Harness) -> None:
@@ -466,11 +577,11 @@ async def test_reviews_command_shows_photos_to_admin(app: Harness) -> None:
 
 
 async def test_reviews_command_is_silent_for_everyone_else(app: Harness) -> None:
-    app.dispatcher["config"] = make_config(frozenset(), app.data_dir)
+    app.as_regular_user()
 
     await app.send("/reviews")
 
-    assert app.session.calls == []
+    assert app.session.sent_texts() == []
 
 
 # ── Справочник ──────────────────────────────────────────────────────

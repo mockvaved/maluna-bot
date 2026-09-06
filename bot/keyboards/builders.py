@@ -7,7 +7,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.content.schemas import Product, RitualQuestion, Texts
 from bot.content.store import ContentSnapshot
-from bot.keyboards.callbacks import AstroCB, DeleteCB, GiftCB, GuideCB, MenuCB, RitualCB
+from bot.keyboards.callbacks import (
+    AstroCB,
+    DeleteCB,
+    GateCB,
+    GiftCB,
+    GuideCB,
+    MenuCB,
+    RitualCB,
+)
 
 CHECKED_MARK = "✅ "
 
@@ -131,15 +139,19 @@ def ritual_result(
 
 # ── Астропрогноз ────────────────────────────────────────────────────
 def subscribe_gate(texts: Texts, channel_url: str) -> InlineKeyboardMarkup:
+    """Экран для неподписанных.
+
+    Кнопки «В меню» здесь нет намеренно: меню само за шлюзом, и она
+    возвращала бы человека на этот же экран.
+    """
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=texts.astro.subscribe_button, url=channel_url)],
+            [InlineKeyboardButton(text=texts.gate.subscribe_button, url=channel_url)],
             [
                 InlineKeyboardButton(
-                    text=texts.astro.check_button, callback_data=AstroCB(action="check").pack()
+                    text=texts.gate.check_button, callback_data=GateCB(action="check").pack()
                 )
             ],
-            [_to_menu_button(texts)],
         ]
     )
 

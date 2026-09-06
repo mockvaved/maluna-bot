@@ -1,6 +1,7 @@
-"""🔮 Астропрогноз 2027 — единственный раздел, где спрашивается дата рождения.
+"""🔮 Астропрогноз 2027 — прогноз по знаку зодиака.
 
-Порядок: проверка подписки на канал → ввод даты → прогноз.
+Подписку на канал здесь не проверяем: с ней разбирается общий шлюз в
+bot/middlewares/subscription.py, неподписанный до раздела не доходит.
 
 Дата живёт только в аргументе функции: она приходит сообщением, из неё
 считается знак, и дальше в состоянии хранится строка-знак. Ни в FSM, ни в
@@ -15,13 +16,11 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from bot.config import Config
 from bot.content.store import ContentSnapshot, ContentStore
 from bot.db.repo import Repository
 from bot.handlers.common import render, reset_flow, show_main_menu, show_screen, user_id_of
-from bot.keyboards.builders import astro_cancel, astro_result, only_menu, subscribe_gate
+from bot.keyboards.builders import astro_cancel, astro_result, only_menu
 from bot.keyboards.callbacks import AstroCB, MenuCB
-from bot.services.subscription import SubscriptionChecker
 from bot.services.zodiac import InvalidDate, find_sign, parse_day_month
 from bot.states import KEY_ATTEMPTS, AstroFlow
 
@@ -34,30 +33,11 @@ router = Router(name="astro")
 
 @router.callback_query(MenuCB.filter(F.section == "astro"))
 async def enter_section(
-    callback: CallbackQuery,
-    state: FSMContext,
-    content_store: ContentStore,
-    repo: Repository,
-    config: Config,
-    subscription: SubscriptionChecker,
+    callback: CallbackQuery, state: FSMContext, content_store: ContentStore, repo: Repository
 ) -> None:
     await callback.answer()
     await repo.log_event(user_id_of(callback), "astro_opened")
-    await _gate(callback, state, content_store.current, config, subscription, use_cache=True)
-
-
-@router.callback_query(AstroCB.filter(F.action == "check"))
-async def recheck_subscription(
-    callback: CallbackQuery,
-    state: FSMContext,
-    content_store: ContentStore,
-    config: Config,
-    subscription: SubscriptionChecker,
-) -> None:
-    """Кнопка «Я подписался»: спрашиваем Telegram заново, минуя кеш."""
-    await callback.answer()
-    subscription.forget(user_id_of(callback))
-    await _gate(callback, state, content_store.current, config, subscription, use_cache=False)
+    await _ask_date(callback, state, content_store.current)
 
 
 @router.callback_query(AstroCB.filter(F.action == "again"))
@@ -104,33 +84,6 @@ async def receive_date(
 
 
 # ── Внутренняя механика ─────────────────────────────────────────────
-async def _gate(
-    callback: CallbackQuery,
-    state: FSMContext,
-    content: ContentSnapshot,
-    config: Config,
-    subscription: SubscriptionChecker,
-    *,
-    use_cache: bool,
-) -> None:
-    texts = content.texts
-    if callback.bot is None:
-        return
-
-    state_result = await subscription.check(
-        callback.bot, user_id_of(callback), use_cache=use_cache
-    )
-    if state_result.allowed:
-        if state_result.check_failed:
-            # Бот не админ в канале: не ломаем раздел, но помечаем в логах.
-            logger.warning("astro_opened_without_check", extra={"user_id": user_id_of(callback)})
-        await _ask_date(callback, state, content)
-        return
-
-    text = texts.astro.subscribe_required if use_cache else texts.astro.not_subscribed_yet
-    await show_screen(callback, text.strip(), subscribe_gate(texts, config.channel_url))
-
-
 async def _ask_date(
     callback: CallbackQuery, state: FSMContext, content: ContentSnapshot
 ) -> None:
