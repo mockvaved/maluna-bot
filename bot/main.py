@@ -19,7 +19,6 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.fsm.storage.base import DefaultKeyBuilder
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
 
 from bot.config import Config, ConfigError, load_config
 from bot.content.loader import ContentError
@@ -118,12 +117,11 @@ async def run() -> None:
     health_runner = await start_health_server(content_store, db, config.health_port)
 
     try:
-        await bot.set_my_commands(
-            [
-                BotCommand(command="start", description="MALUNA"),
-                BotCommand(command="delete", description="delete my data"),
-            ]
-        )
+        # Меню команд не показываем: бот и так работает кнопками, а список
+        # из двух пунктов только занимал место. Удаляем явно — команды
+        # хранятся на стороне Telegram и сами не исчезнут.
+        # Про /delete человек узнаёт из раздела «О бренде».
+        await bot.delete_my_commands()
         # drop_pending_updates: после простоя не отвечаем на старые нажатия.
         await dispatcher.start_polling(bot, drop_pending_updates=True)
     finally:
